@@ -1,70 +1,101 @@
-import React from 'react';
+import React, { useState, useEffect, FormEvent } from 'react';
 import { FiChevronRight } from 'react-icons/fi';
+import { Link } from 'react-router-dom';
+import api from '../../services/api';
 
 import logoImg from '../../assets/logo.svg';
 
-import { Title, Form, Repositories } from './styles';
+import { Title, Form, Repositories, Error } from './styles';
+
+interface Repository {
+  full_name: string;
+  description: string;
+  owner: {
+    login: string;
+    avatar_url: string;
+  };
+}
 
 const Dashboard: React.FC = () => {
+  const [newRepo, setNewRepo] = useState('');
+  const [inputError, setInputError] = useState('');
+  const [repositories, setRepositories] = useState<Repository[]>(() => {
+    const storedRepositories = localStorage.getItem(
+      '@GitubExplorer:repositories',
+    );
+
+    if (storedRepositories) {
+      return JSON.parse(storedRepositories);
+    }
+    return [];
+  });
+
+  // every time i have a change in the state, i'll save in the localstorage
+  useEffect(() => {
+    localStorage.setItem(
+      '@GitubExplorer:repositories',
+      JSON.stringify(repositories),
+    );
+  }, [repositories]);
+
+  async function handleAddRepository(
+    event: FormEvent<HTMLFormElement>,
+  ): Promise<void> {
+    event.preventDefault();
+
+    if (!newRepo) {
+      setInputError('Digite autor/nome do repositório');
+      return;
+    }
+
+    try {
+      const response = await api.get<Repository>(`repos/${newRepo}`);
+
+      const repository = response.data;
+
+      setRepositories([...repositories, repository]);
+      setNewRepo('');
+      setInputError('');
+    } catch (err) {
+      setInputError('Erro na busca do repositório');
+    }
+  }
+
   return (
     <>
       <img src={logoImg} alt="github explorer" />
       <Title>Explore repositórios no GitHub.</Title>
 
-      <Form>
-        <input placeholder="Digite o nome do repositório" />
+      {/* !! transform the var in falsy/truthy values */}
+      <Form hasError={!!inputError} onSubmit={handleAddRepository}>
+        <input
+          value={newRepo}
+          onChange={e => setNewRepo(e.target.value)}
+          placeholder="Digite o nome do repositório"
+        />
         <button type="submit">Pesquisar</button>
       </Form>
 
+      {inputError && <Error>{inputError}</Error>}
+
       <Repositories>
-        <a href="test">
-          <img
-            src="https://avatars2.githubusercontent.com/u/53925545?s=460&u=904efc75e5a025f462a287e9132d5746ae0b40f0&v=4"
-            alt="Andrew"
-          />
-          <div>
-            <strong>drewProgram/spotifyFront</strong>
-            <p>Front-end of the spotify web page with React.</p>
-          </div>
+        {repositories.map(repository => (
+          <Link
+            key={repository.full_name}
+            to={`/repositories/${repository.full_name}`}
+          >
+            <img
+              src={repository.owner.avatar_url}
+              alt={repository.owner.login}
+            />
+            <div>
+              <strong>{repository.full_name}</strong>
+              <p>{repository.description}</p>
+            </div>
 
-          <FiChevronRight size={20} />
-        </a>
-        <a href="test">
-          <img
-            src="https://avatars2.githubusercontent.com/u/53925545?s=460&u=904efc75e5a025f462a287e9132d5746ae0b40f0&v=4"
-            alt="Andrew"
-          />
-          <div>
-            <strong>drewProgram/spotifyFront</strong>
-            <p>Front-end of the spotify web page with React.</p>
-          </div>
-
-          <FiChevronRight size={20} />
-        </a>
-        <a href="test">
-          <img
-            src="https://avatars2.githubusercontent.com/u/53925545?s=460&u=904efc75e5a025f462a287e9132d5746ae0b40f0&v=4"
-            alt="Andrew"
-          />
-          <div>
-            <strong>drewProgram/spotifyFront</strong>
-            <p>Front-end of the spotify web page with React.</p>
-          </div>
-
-          <FiChevronRight size={20} />
-        </a>
-        <a href="test">
-          <img
-            src="https://avatars2.githubusercontent.com/u/53925545?s=460&u=904efc75e5a025f462a287e9132d5746ae0b40f0&v=4"
-            alt="Andrew"
-          />
-          <div>
-            <strong>drewProgram/spotifyFront</strong>
-            <p>Front-end of the spotify web page with React.</p>
-          </div>
-
-          <FiChevronRight size={20} />
-        </a>
+            <FiChevronRight size={20} />
+          </Link>
+        ))}
       </Repositories>
     </>
   );
